@@ -74,6 +74,15 @@ from ultralytics.nn.modules import (
     YOLOESegment26,
     v10Detect,
 )
+from ultralytics.nn.extra_modules import (
+    BiLevelRoutingAttention,
+    GatedFFN,
+    AgentBlock,
+    CED,
+    C2fFE,
+)
+from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
+from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils import (
     DEFAULT_CFG_DICT,
     LOGGER,
@@ -1911,6 +1920,9 @@ def parse_model(d, ch, verbose=True):
             SCDown,
             C2fCIB,
             A2C2f,
+
+            C2fFE,
+            AgentBlock,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
@@ -1930,6 +1942,8 @@ def parse_model(d, ch, verbose=True):
             C2fCIB,
             C2PSA,
             A2C2f,
+
+            C2fFE,
         }
     )
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
@@ -1970,6 +1984,9 @@ def parse_model(d, ch, verbose=True):
                     args.extend((True, 1.2))
             if m is C2fCIB:
                 legacy = False
+        elif m in frozenset({BiLevelRoutingAttention,}):
+            c2=ch[f]
+            args=[c2,*args]
         elif m is AIFI:
             args = [ch[f], *args]
         elif m in frozenset({HGStem, HGBlock}):

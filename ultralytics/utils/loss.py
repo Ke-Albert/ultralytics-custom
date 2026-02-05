@@ -338,8 +338,9 @@ class v8DetectionLoss:
         device = next(model.parameters()).device  # get model device
         h = model.args  # hyperparameters
 
+        # pos_weight=torch.tensor([1,3])#针对CEMS小间操作设备，损失权重乘以3，而人员操作不变
         m = model.model[-1]  # Detect() module
-        self.bce = nn.BCEWithLogitsLoss(reduction="none")
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=None,reduction="none")
         self.hyp = h
         self.stride = m.stride  # model strides
         self.nc = m.nc  # number of classes

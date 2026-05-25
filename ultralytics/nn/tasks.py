@@ -11,6 +11,13 @@ import torch
 import torch.nn as nn
 
 from ultralytics.nn.autobackend import check_class_names
+from ultralytics.nn.extra_modules import (
+    CED,
+    AgentBlock,
+    BiLevelRoutingAttention,
+    C2fFE,
+    GatedFFN,
+)
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -72,13 +79,6 @@ from ultralytics.nn.modules import (
     YOLOESegment,
     YOLOESegment26,
     v10Detect,
-)
-from ultralytics.nn.extra_modules import (
-    BiLevelRoutingAttention,
-    GatedFFN,
-    AgentBlock,
-    CED,
-    C2fFE,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -293,7 +293,7 @@ class BaseModel(torch.nn.Module):
         self = super()._apply(fn)
         m = self.model[-1]  # Detect()
         if isinstance(
-                m, Detect
+            m, Detect
         ):  # includes all Detect subclasses like Segment, Pose, OBB, WorldDetect, YOLOEDetect, YOLOESegment
             m.stride = fn(m.stride)
             m.anchors = fn(m.anchors)
@@ -506,9 +506,9 @@ class DetectionModel(BaseModel):
             (list[torch.Tensor]): Clipped detection tensors.
         """
         nl = self.model[-1].nl  # number of detection layers (P3-P5)
-        g = sum(4 ** x for x in range(nl))  # grid points
+        g = sum(4**x for x in range(nl))  # grid points
         e = 1  # exclude layer count
-        i = (y[0].shape[-1] // g) * sum(4 ** x for x in range(e))  # indices
+        i = (y[0].shape[-1] // g) * sum(4**x for x in range(e))  # indices
         y[0] = y[0][..., :-i]  # large
         i = (y[-1].shape[-1] // g) * sum(4 ** (nl - 1 - x) for x in range(e))  # indices
         y[-1] = y[-1][..., i:]  # small
@@ -1163,7 +1163,7 @@ class YOLOEModel(DetectionModel):
         return torch.cat(all_pe, dim=1)
 
     def predict(
-            self, x, profile=False, visualize=False, tpe=None, augment=False, embed=None, vpe=None, return_vpe=False
+        self, x, profile=False, visualize=False, tpe=None, augment=False, embed=None, vpe=None, return_vpe=False
     ):
         """Perform a forward pass through the model.
 
@@ -1440,16 +1440,16 @@ def torch_safe_load(weight, safe_only=False):
     file = attempt_download_asset(weight)  # search online if missing locally
     try:
         with temporary_modules(
-                modules={
-                    "ultralytics.yolo.utils": "ultralytics.utils",
-                    "ultralytics.yolo.v8": "ultralytics.models.yolo",
-                    "ultralytics.yolo.data": "ultralytics.data",
-                },
-                attributes={
-                    "ultralytics.nn.modules.block.Silence": "torch.nn.Identity",  # YOLOv9e
-                    "ultralytics.nn.tasks.YOLOv10DetectionModel": "ultralytics.nn.tasks.DetectionModel",  # YOLOv10
-                    "ultralytics.utils.loss.v10DetectLoss": "ultralytics.utils.loss.E2EDetectLoss",  # YOLOv10
-                },
+            modules={
+                "ultralytics.yolo.utils": "ultralytics.utils",
+                "ultralytics.yolo.v8": "ultralytics.models.yolo",
+                "ultralytics.yolo.data": "ultralytics.data",
+            },
+            attributes={
+                "ultralytics.nn.modules.block.Silence": "torch.nn.Identity",  # YOLOv9e
+                "ultralytics.nn.tasks.YOLOv10DetectionModel": "ultralytics.nn.tasks.DetectionModel",  # YOLOv10
+                "ultralytics.utils.loss.v10DetectLoss": "ultralytics.utils.loss.E2EDetectLoss",  # YOLOv10
+            },
         ):
             if safe_only:
                 # Load via custom pickle module
@@ -1607,7 +1607,6 @@ def parse_model(d, ch, verbose=True):
             SCDown,
             C2fCIB,
             A2C2f,
-
             C2fFE,
             AgentBlock,
             GatedFFN,
@@ -1631,7 +1630,6 @@ def parse_model(d, ch, verbose=True):
             C2fCIB,
             C2PSA,
             A2C2f,
-
             C2fFE,
             GatedFFN,
         }
@@ -1671,9 +1669,13 @@ def parse_model(d, ch, verbose=True):
                     args.extend((True, 1.2))
             if m is C2fCIB:
                 legacy = False
-        elif m in frozenset({BiLevelRoutingAttention,}):
-            c2=ch[f]
-            args=[c2,*args]
+        elif m in frozenset(
+            {
+                BiLevelRoutingAttention,
+            }
+        ):
+            c2 = ch[f]
+            args = [c2, *args]
         elif m is AIFI:
             args = [ch[f], *args]
         elif m in frozenset({HGStem, HGBlock}):
@@ -1689,19 +1691,19 @@ def parse_model(d, ch, verbose=True):
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
         elif m in frozenset(
-                {
-                    Detect,
-                    WorldDetect,
-                    YOLOEDetect,
-                    Segment,
-                    Segment26,
-                    YOLOESegment,
-                    YOLOESegment26,
-                    Pose,
-                    Pose26,
-                    OBB,
-                    OBB26,
-                }
+            {
+                Detect,
+                WorldDetect,
+                YOLOEDetect,
+                Segment,
+                Segment26,
+                YOLOESegment,
+                YOLOESegment26,
+                Pose,
+                Pose26,
+                OBB,
+                OBB26,
+            }
         ):
             args.extend([reg_max, end2end, [ch[x] for x in f]])
             if m is Segment or m is YOLOESegment or m is Segment26 or m is YOLOESegment26:

@@ -1,42 +1,31 @@
-from typing import List, Optional, Tuple
-
 import torch
 import torch.nn as nn
 
 from ..modules import Conv, RepConv
-from .attention import EMA, PatchEmbed, AgentAttention
+from .attention import EMA, AgentAttention, PatchEmbed
 
 __all__ = (
     "CED",
-    "GatedFFN",
     "AgentBlock",
     "C2fFE",
+    "GatedFFN",
 )
 
 
 class GatedFFN(nn.Module):
-    """
-    RemDet网络中GatedFFN实现
-    门控前馈网络（Gated Feed-Forward Network）
-    c1	int	无默认值	输入特征图的通道数（必须指定，如 backbone 输出的 256 通道）
-    c2	int	无默认值	输出特征图的通道数（需与后续模块输入通道匹配，如 neck 所需的 512 通道）
-    n	int	1	深度可分离卷积的堆叠次数（控制模块深度，n 越大特征提取越充分）
-    shortcut	bool	False	是否启用残差连接（缓解梯度消失，需满足 c1 == c2 才生效）
-    e	int	3	通道扩展系数（控制中间特征通道数，self.c = c2 * e，平衡表达与效率）
+    """RemDet网络中GatedFFN实现 门控前馈网络（Gated Feed-Forward Network） c1 int 无默认值 输入特征图的通道数（必须指定，如 backbone 输出的 256 通道） c2 int
+    无默认值 输出特征图的通道数（需与后续模块输入通道匹配，如 neck 所需的 512 通道） n int 1 深度可分离卷积的堆叠次数（控制模块深度，n 越大特征提取越充分） shortcut bool False
+    是否启用残差连接（缓解梯度消失，需满足 c1 == c2 才生效） e int 3 通道扩展系数（控制中间特征通道数，self.c = c2 * e，平衡表达与效率）.
 
     1. 动态门控机制：精准筛选特征
-    传统 FFN 对所有特征通道一视同仁，冗余特征会干扰后续检测；
-    GatedFFN 用 z 生成动态权重，通过 x * GELU(z) 抑制无用特征（如背景噪声），聚焦目标相关特征（如边缘、纹理），尤其适合小目标 / 遮挡目标检测。
+    传统 FFN 对所有特征通道一视同仁，冗余特征会干扰后续检测； GatedFFN 用 z 生成动态权重，通过 x * GELU(z) 抑制无用特征（如背景噪声），聚焦目标相关特征（如边缘、纹理），尤其适合小目标 / 遮挡目标检测。
     2. 重参数化 + 深度可分离卷积：高效轻量
-    RepDWConv：训练时多分支保证表达能力，推理时融合为单分支，速度提升 30%+；
-    深度可分离卷积：参数量仅为普通卷积的 1/groups（此处 groups=self.c，参数量降至 1/self.c），计算量大幅降低，适合实时场景（如端侧设备）。
+    RepDWConv：训练时多分支保证表达能力，推理时融合为单分支，速度提升 30%+； 深度可分离卷积：参数量仅为普通卷积的 1/groups（此处 groups=self.c，参数量降至
+    1/self.c），计算量大幅降低，适合实时场景（如端侧设备）。
     3. 通道扩展 - 压缩：兼顾表达与冗余
-    先通过 self.proj 扩展通道（2*self.c），让中间特征能捕捉更丰富的信息；
-    再通过 self.cv2 压缩回 c2，减少冗余参数，避免过拟合。
+    先通过 self.proj 扩展通道（2*self.c），让中间特征能捕捉更丰富的信息； 再通过 self.cv2 压缩回 c2，减少冗余参数，避免过拟合。
     4. 可配置化设计：适配不同任务
-    可通过 n 调整特征提取深度（小目标检测用 n=2~3，大目标用 n=1）；
-    可通过 e 调整通道扩展幅度（复杂场景用 e=4，简单场景用 e=2）；
-    可通过 shortcut 控制残差连接（深层模型启用，浅层模型禁用）。
+    可通过 n 调整特征提取深度（小目标检测用 n=2~3，大目标用 n=1）； 可通过 e 调整通道扩展幅度（复杂场景用 e=4，简单场景用 e=2）； 可通过 shortcut 控制残差连接（深层模型启用，浅层模型禁用）。
     """
 
     def __init__(self, c1, c2, num_blocks, shortcut=False, expansion=3):
@@ -45,8 +34,7 @@ class GatedFFN(nn.Module):
         self.c = int(c2 * expansion)
         self.prj = Conv(c1, 2 * self.c, k=1, s=1)
         self.rep = RepConv(self.c, self.c)
-        self.m = nn.ModuleList(
-            Conv(self.c, self.c, k=3, s=1, g=self.c) for _ in range(self.n - 1))
+        self.m = nn.ModuleList(Conv(self.c, self.c, k=3, s=1, g=self.c) for _ in range(self.n - 1))
         self.act = nn.GELU()
         self.cv2 = Conv(self.c, c2, k=1, s=1, act=False)
         self.add = shortcut and c1 == c2
@@ -64,9 +52,7 @@ class GatedFFN(nn.Module):
 
 
 class CED(nn.Module):
-    """
-    RemDet中CED模块的实现
-    """
+    """RemDet中CED模块的实现."""
 
     def __init__(self, c1, c2, expansion=0.5):
         super().__init__()
@@ -77,18 +63,23 @@ class CED(nn.Module):
 
     def forward(self, x):
         x = self.dwconv(self.cv1(x))
-        x = torch.cat([
-            x[..., ::2, ::2], x[..., 1::2, ::2],
-            x[..., ::2, 1::2], x[..., 1::2, 1::2],
-        ], dim=1)
+        x = torch.cat(
+            [
+                x[..., ::2, ::2],
+                x[..., 1::2, ::2],
+                x[..., ::2, 1::2],
+                x[..., 1::2, 1::2],
+            ],
+            dim=1,
+        )
         x = self.cv2(x)
         return x
 
 
 class C2fFE(nn.Module):
     def __init__(self, c1: int, c2: int, n: int = 1, if_backbone=False, e: float = 0.5):
-        """
-        Initialize an improvement C2f block.
+        """Initialize an improvement C2f block.
+
         Args:
             c1 (int): Input channels.
             c2 (int): Output channels.
@@ -142,8 +133,9 @@ class Pconv(nn.Module):
         assert c_in // cp_factor > 0
 
     def forward(self, x):
-        x1, x2 = torch.split(x, [self.c_in // self.cp_factor, (self.c_in // self.cp_factor) * (self.cp_factor - 1)],
-                             dim=1)
+        x1, x2 = torch.split(
+            x, [self.c_in // self.cp_factor, (self.c_in // self.cp_factor) * (self.cp_factor - 1)], dim=1
+        )
         x1 = self.conv(x1)
         return torch.cat([x1, x2], dim=1)
 
@@ -158,7 +150,7 @@ class AgentBlock(nn.Module):
         self.agent_attn = AgentAttention(dim=self.embed_dim, num_patches=25)
 
     def forward(self, x):
-        B, C, H, W = x.shape
+        B, C, _H, _W = x.shape
         assert self.c_in == C
         patch_size = 4
 

@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from ultralytics.utils.metrics import CITYSCAPES_WEIGHT, OKS_SIGMA, RLE_WEIGHT
 from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
@@ -345,7 +345,7 @@ class v8DetectionLoss:
 
         # pos_weight=torch.tensor([1,3])#针对CEMS小间操作设备，损失权重乘以3，而人员操作不变
         m = model.model[-1]  # Detect() module
-        self.bce = nn.BCEWithLogitsLoss(pos_weight=None,reduction="none")
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=None, reduction="none")
         self.hyp = h
         self.stride = m.stride  # model strides
         self.nc = m.nc  # number of classes

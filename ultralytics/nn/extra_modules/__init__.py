@@ -1,17 +1,15 @@
+from .attention import BiLevelRoutingAttention
 from .block import (
     CED,
-    GatedFFN,
-    C2fFE,
     AgentBlock,
-)
-from .attention import (
-    BiLevelRoutingAttention
+    C2fFE,
+    GatedFFN,
 )
 
 __all__ = (
-    "GatedFFN",
     "CED",
-    "C2fFE",
     "AgentBlock",
     "BiLevelRoutingAttention",
+    "C2fFE",
+    "GatedFFN",
 )
